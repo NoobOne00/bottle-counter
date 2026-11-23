@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Bottle Counter – Vision</title>
+<meta name="theme-color" content="#14171c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BottleCount">
+<style>
+  :root{
+    --bg:#14171c; --panel:#1c2027; --panel2:#242932; --line:#2f3540;
+    --ink:#eef1f5; --mute:#8b94a3; --amber:#f5b400; --amber-ink:#1a1400;
+    --ok:#3ccf7a; --over:#ff6b4a; --blue:#3aa0ff;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  button{font:inherit;color:inherit}
+  .wrap{max-width:620px;margin:0 auto;padding:10px 12px 40px}
+  header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  header h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0;flex:1;white-space:nowrap}
+  .iconbtn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:13px;cursor:pointer}
+  .iconbtn:active{transform:scale(.97)}
+  #installBtn{display:none;border-color:var(--amber);color:var(--amber)}
+
+  .stage{position:relative;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/9}
+  #view{width:100%;height:100%;display:block;touch-action:none}
+  #stageMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;
+    color:var(--mute);font-size:14px;background:rgba(10,12,15,.85)}
+  #stageMsg:empty{display:none}
+  .chip{position:absolute;top:8px;font:600 10.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;
+    padding:4px 8px;border-radius:20px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.15)}
+  #engineChip{left:8px} #fpsChip{right:8px;font-family:var(--mono);letter-spacing:0}
+
+  .meter{margin:10px 0 6px}
+  .meter .t{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:4px}
+  .meter .t b{font-family:var(--mono);color:var(--ink);letter-spacing:0}
+  .mbar{position:relative;height:10px;background:var(--panel2);border-radius:6px;overflow:hidden}
+  .mbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--blue);transition:width .08s}
+  .mbar i.on{background:var(--ok)}
+  .mbar .th{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.55)}
+
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+  .tabs button{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 4px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--mute)}
+  .tabs button.act{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
+  .tabs button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--line);margin-right:6px;vertical-align:1px}
+  .tabs button .dot.done{background:var(--ok)}
+  section{display:none} section.act{display:block}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+  .card h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .card p{margin:0 0 10px;color:var(--mute);font-size:13.5px}
+  .card p b{color:var(--ink)}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row > *{flex:1}
+  .btn{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:12px 10px;font-size:14.5px;font-weight:600;cursor:pointer;min-height:46px}
+  .btn:active{transform:scale(.98)}
+  .btn:disabled{opacity:.35;pointer-events:none}
+  .btn.primary{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
+  .btn.go{background:#1f3a2b;color:var(--ok);border-color:#2c5a40}
+  .btn.warn{background:#3a3220;color:var(--amber);border-color:#5a4a20}
+  .btn.sel{border-color:var(--amber);color:var(--amber)}
+  label.f{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 3px 2px}
+  input[type=text],input[type=number],select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font-size:15px;outline:none;-webkit-appearance:none}
+  input[type=range]{width:100%;accent-color:var(--amber)}
+
+  .hold{position:relative;height:96px;border-radius:16px;font-size:16px;font-weight:700;letter-spacing:.04em;cursor:pointer;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;border:2px solid var(--line);background:var(--panel2)}
+  .hold small{display:block;font-size:11.5px;font-weight:500;color:var(--mute);letter-spacing:0;margin-top:3px}
+  .hold .n{position:absolute;top:8px;right:10px;font-family:var(--mono);font-size:12px;color:var(--mute)}
+  .hold.empty.active{background:#16304d;border-color:var(--blue)}
+  .hold.bottle.active{background:#1f3a2b;border-color:var(--ok)}
+  .hold:disabled{opacity:.35}
+  .linkbtn{background:none;border:0;color:var(--mute);font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px 0}
+
+  .big{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  #count{font-family:var(--mono);font-size:clamp(64px,22vw,104px);font-weight:700;line-height:.95;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+  .state{font:700 11px system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:5px 9px;border-radius:20px;background:var(--panel2);color:var(--mute);white-space:nowrap}
+  .state.run{background:#1f3a2b;color:var(--ok)} .state.pause{background:#3a3220;color:var(--amber)}
+  .state.stop{background:#3a1d18;color:var(--over)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px}
+  .stat .k{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  .stat .v{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .stat .v small{font-size:10.5px;color:var(--mute);font-weight:400;margin-left:2px}
+  .stat.hl .v{color:var(--amber)}
+  .thumbs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  .th{flex:0 0 auto;width:62px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--mute)}
+  .th img,.th .ph{width:62px;height:62px;border-radius:8px;object-fit:cover;display:block;border:2px solid var(--line);background:var(--panel2)}
+  .th.flag img{border-color:var(--over)}
+  .th.man .ph{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--amber)}
+  .empty{color:var(--mute);font-size:13px;padding:6px 0}
+  .alert{display:none;background:#3a1d18;border:1px solid #5a2a22;color:#ffb3a3;border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:10px}
+  .alert.show{display:block}
+
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
+  .sheet.open{display:flex}
+  .sheet .box{background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:620px;
+    max-height:88vh;overflow:auto;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:0 0 6px;font-size:17px}
+  .sheet p{color:var(--mute);margin:0 0 12px;font-size:14px}
+  .opt{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .opt input[type=number]{width:86px;text-align:right}
+  .opt input[type=checkbox]{width:22px;height:22px;accent-color:var(--amber)}
+  .opt small{display:block;color:var(--mute);font-size:12px}
+  table.sum{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px}
+  table.sum td{padding:7px 2px;border-bottom:1px solid var(--line)}
+  table.sum td:last-child{text-align:right;font-family:var(--mono);font-weight:600}
+  .hist{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}
+  .hist .t{font-weight:600}
+  .hist .m{font-family:var(--mono);font-size:12px;color:var(--mute);margin:3px 0 8px}
+  textarea.csv{width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;font-family:var(--mono);font-size:11px;padding:8px}
+  #toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%) translateY(-150%);opacity:0;
+    background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:20px;font-size:13.5px;font-weight:600;transition:.25s;z-index:40;pointer-events:none;max-width:90vw;text-align:center}
+  #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>▣ Bottle Counter</h1>
+    <button class="iconbtn" id="installBtn">Install</button>
+    <button class="iconbtn" id="histBtn">History</button>
+    <button class="iconbtn" id="setBtn" aria-label="Settings">⚙</button>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="view" width="640" height="360"></canvas>
+    <div id="stageMsg">Choose <b>&nbsp;Camera&nbsp;</b> or <b>&nbsp;Demo conveyor&nbsp;</b> below to start.</div>
+    <span class="chip" id="engineChip">Loading AI…</span>
+    <span class="chip" id="fpsChip">— fps</span>
+  </div>
+
+  <div class="meter">
+    <div class="t"><span>Bottle in zone — confidence</span><b id="mPct">teach first</b></div>
+    <div class="mbar"><i id="mFill"></i><span class="th" id="thOn"></span><span class="th" id="thOff"></span></div>
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="zone" class="act"><span class="dot" id="dZone"></span>1 · Zone</button>
+    <button data-tab="teach"><span class="dot" id="dTeach"></span>2 · Teach</button>
+    <button data-tab="count"><span class="dot" id="dCount"></span>3 · Count</button>
+  </nav>
+
+  <!-- ZONE -->
+  <section id="tab-zone" class="act">
+    <div class="card">
+      <h2>Video source</h2>
+      <div class="row">
+        <button class="btn" id="camBtn">📷 Camera</button>
+        <button class="btn" id="demoBtn">▶ Demo conveyor</button>
+      </div>
+      <div id="demoOpts" style="display:none;margin-top:10px">
+        <label class="f">Demo speed: <span id="demoRateLbl">30</span> bottles/min</label>
+        <input type="range" id="demoRate" min="10" max="60" step="1" value="30">
+        <div class="row" style="margin-top:6px"><button class="btn" id="demoStop">Simulate 15 s line stop</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Detection zone <button class="linkbtn" id="zoneReset">Reset zone</button></h2>
+      <p><b>Drag on the picture</b> to draw a narrow box across the bottles' path, a little taller than the tallest bottle. Each bottle must pass fully through it, with belt visible between bottles.</p>
+      <p style="margin:0">Tips: fix the phone on a tripod or clamp — don't hand-hold. Use side-on view. Avoid people walking through the zone. Keep the lighting steady.</p>
+    </div>
+  </section>
+
+  <!-- TEACH -->
+  <section id="tab-teach">
+    <div class="card">
+      <h2>Teach the AI <span id="teachState" style="text-transform:none;letter-spacing:0"></span></h2>
+      <p><b>Hold</b> a button to capture samples (about 8 per second). Aim for <b>30+ each</b>. Capture BOTTLE only while a bottle is fully inside the zone, and EMPTY only when the zone shows bare belt.</p>
+      <div class="row">
+        <button class="hold empty" id="holdEmpty" disabled><span class="n" id="nEmpty">0</span>HOLD: EMPTY<small>bare belt in zone</small></button>
+        <button class="hold bottle" id="holdBottle" disabled><span class="n" id="nBottle">0</span>HOLD: BOTTLE<small>bottle fully in zone</small></button>
+      </div>
+      <div class="row" style="margin-top:4px">
+        <button class="linkbtn" id="clrEmpty" style="flex:0 1 auto">Clear empty</button>
+        <button class="linkbtn" id="clrBottle" style="flex:0 1 auto">Clear bottle</button>
+      </div>
+      <p style="margin:8px 0 0">Check: watch the confidence bar above as bottles pass — it should rise above the right marker for every bottle and drop below the left marker between them. If not, add more samples of the case it gets wrong.</p>
+    </div>
+    <div class="card">
+      <h2>Saved line setups</h2>
+      <p>Saves the zone and the taught samples so you can reuse them on the same line with the phone in the same position.</p>
+      <div class="row"><input type="text" id="profName" placeholder="e.g. Line 2 – 1.5 L"><button class="btn" id="profSave" style="flex:0 0 90px">Save</button></div>
+      <div id="profList" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- COUNT -->
+  <section id="tab-count">
+    <div class="alert" id="alert"></div>
+    <div class="card">
+      <div class="big">
+        <div>
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)">Bottles counted</div>
+          <div id="count">0</div>
+        </div>
+        <span class="state" id="sessState">READY</span>
+      </div>
+      <div class="stats">
+        <div class="stat hl"><div class="k">Bottles / min</div><div class="v" id="vRate">—</div></div>
+        <div class="stat"><div class="k">Avg cycle</div><div class="v" id="vCycle">—</div></div>
+        <div class="stat"><div class="k">Bottles / hour</div><div class="v" id="vHour">—</div></div>
+        <div class="stat"><div class="k">Elapsed</div><div class="v" id="vElapsed">0:00</div></div>
+        <div class="stat"><div class="k">Remaining</div><div class="v" id="vRemain">—</div></div>
+        <div class="stat"><div class="k">Downtime</div><div class="v" id="vDown">0:00</div></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn go" id="runBtn" style="flex:2;min-height:58px;font-size:17px">START</button>
+        <button class="btn" id="finishBtn" style="min-height:58px" disabled>FINISH</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="minusBtn" disabled>−1 false count</button>
+        <button class="btn" id="plusBtn" disabled>+1 missed bottle</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Session</h2>
+      <div class="row">
+        <div><label class="f">Duration</label>
+          <select id="durSel"><option value="0">No limit</option><option value="5">5 min</option><option value="10">10 min</option>
+            <option value="15" selected>15 min</option><option value="30">30 min</option><option value="60">60 min</option></select></div>
+        <div><label class="f">Line / product</label><input type="text" id="lineName" placeholder="e.g. Line 2 – 1.5 L"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Recent counts <span style="text-transform:none;letter-spacing:0">red = flagged, check it</span></h2>
+      <div class="thumbs" id="thumbs"><div class="empty">Snapshots of each counted bottle appear here.</div></div>
+    </div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet"><div class="box" id="sheetBox"></div></div>
+<div id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDur = ms => { const s = Math.max(0, Math.round(ms/1000)), h = Math.floor(s/3600), m = Math.floor(s%3600/60), r = s%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` : `${m}:${String(r).padStart(2,'0')}`; };
+
+// ================= settings =================
+const DEF = { on:0.65, off:0.35, minOn:2, minOff:2, smooth:0.5, fps:15, stopSec:10, beep:true, wake:true };
+const S = Object.assign({}, DEF, store.get('bc.settings', {}));
+let ZONE = store.get('bc.zone', null) || { x:0.44, y:0.15, w:0.12, h:0.72 };
+const saveSettings = () => store.set('bc.settings', S);
+const saveZone = () => store.set('bc.zone', ZONE);
+
+// ================= toast / sheet =================
+let tt;
+function toast(m){ const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); }
+function openSheet(html){ $('sheetBox').innerHTML = html; $('sheet').classList.add('open'); }
+function closeSheet(){ $('sheet').classList.remove('open'); }
+$('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+function confirmBox(title, text, okLabel, onOk){
+  openSheet(`<h3>${title}</h3><p>${text}</p><div class="row"><button class="btn" id="cNo">Cancel</button><button class="btn warn" id="cYes">${okLabel}</button></div>`);
+  $('cNo').onclick = closeSheet; $('cYes').onclick = () => { closeSheet(); onOk(); };
+}
+
+// ================= tabs =================
+function showTab(name){
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('act', b.dataset.tab === name));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('act', s.id === 'tab-' + name));
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+// ================= demo conveyor =================
+const demo = {
+  w:640, h:360, canvas:document.createElement('canvas'), bottles:[], rate:30, speed:150,
+  nextSpawn:0, last:0, beltOff:0, passed:0, stopUntil:0, active:false,
+  init(){ this.canvas.width = this.w; this.canvas.height = this.h; this.ctx = this.canvas.getContext('2d'); },
+  start(){ this.active = true; this.bottles = []; this.passed = 0; this.last = performance.now(); this.nextSpawn = this.last + 300; },
+  step(now){
+    const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
+    const moving = now >= this.stopUntil;
+    if (moving){
+      const dx = this.speed * dt; this.beltOff = (this.beltOff + dx) % 40;
+      this.bottles.forEach(b => b.x += dx);
+      if (now >= this.nextSpawn){
+        const prev = this.bottles[this.bottles.length - 1];
+        if (!prev || prev.x > 90){ this.bottles.push({ x:-40, hue: 200 + Math.random()*10, tilt:(Math.random()-.5)*0.03 }); }
+        this.nextSpawn = now + (60000 / this.rate) * (0.8 + Math.random() * 0.4);
+      }
+    } else { this.nextSpawn += dt * 1000; }
+    const zr = (ZONE.x + ZONE.w) * this.w;
+    this.bottles.forEach(b => { if (!b.done && b.x - 30 > zr){ b.done = true; this.passed++; } });
+    this.bottles = this.bottles.filter(b => b.x < this.w + 60);
+  },
+  draw(){
+    const c = this.ctx, W = this.w, H = this.h;
+    const g = c.createLinearGradient(0,0,0,H); g.addColorStop(0,'#5b6068'); g.addColorStop(1,'#3d4148');
+    c.fillStyle = g; c.fillRect(0,0,W,H);
+    c.fillStyle = '#4a4f57'; for (let x = -20; x < W; x += 80) c.fillRect(x, 20, 40, 120);   // background panels
+    c.fillStyle = '#26292e'; c.fillRect(0, 268, W, 34);                                       // belt
+    c.fillStyle = '#30343a'; for (let x = -40 + this.beltOff; x < W; x += 40) c.fillRect(x, 270, 3, 30);
+    c.fillStyle = '#8d939c'; c.fillRect(0, 262, W, 6); c.fillRect(0, 302, W, 6);              // guide rails
+    this.bottles.forEach(b => this.drawBottle(c, b));
+    // sensor-like noise & flicker
+    c.fillStyle = `rgba(255,255,255,${0.02 + Math.random()*0.03})`; c.fillRect(0,0,W,H);
+  },
+  drawBottle(c, b){
+    c.save(); c.translate(b.x, 268); c.rotate(b.tilt);
+    c.fillStyle = `hsla(${b.hue},70%,62%,.9)`;
+    c.beginPath(); c.roundRect(-26, -128, 52, 128, 12); c.fill();       // body
+    c.beginPath(); c.moveTo(-26,-118); c.quadraticCurveTo(-24,-150,-9,-162); c.lineTo(9,-162); c.quadraticCurveTo(24,-150,26,-118); c.fill(); // shoulder
+    c.fillRect(-9, -184, 18, 24);                                          // neck
+    c.fillStyle = '#e94b35'; c.fillRect(-11, -196, 22, 13);              // cap
+    c.fillStyle = '#f2f2f2'; c.fillRect(-26, -86, 52, 40);               // label
+    c.fillStyle = '#1d6fd1'; c.fillRect(-26, -70, 52, 9);
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(-18, -124, 6, 110); // highlight
+    c.restore();
+  }
+};
+demo.init();
+
+// ================= video source =================
+const video = document.createElement('video');
+video.setAttribute('playsinline',''); video.setAttribute('muted',''); video.muted = true; video.playsInline = true; video.autoplay = true;
+let source = null, stream = null;
+const view = $('view'), vctx = view.getContext('2d');
+function stopSource(){
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  demo.active = false; source = null;
+}
+function sizeView(w, h){
+  const scale = Math.min(1, 960 / w); view.width = Math.round(w * scale); view.height = Math.round(h * scale);
+  $('stage').style.aspectRatio = `${w} / ${h}`;
+}
+async function useCamera(){
+  stopSource(); $('stageMsg').textContent = 'Starting camera…';
+  try{
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('This browser has no camera access here.');
+    stream = await navigator.mediaDevices.getUserMedia({ audio:false,
+      video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 }, frameRate:{ ideal:30 } } });
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    if (!video.videoWidth) await new Promise(r => video.addEventListener('loadedmetadata', r, { once:true }));
+    source = 'camera'; sizeView(video.videoWidth, video.videoHeight);
+    $('stageMsg').textContent = ''; $('demoOpts').style.display = 'none';
+    $('camBtn').classList.add('sel'); $('demoBtn').classList.remove('sel');
+    afterSource();
+  }catch(e){
+    $('stageMsg').innerHTML = `Camera not available (${esc(e.name || e.message || e)}).<br>Open the app from its https:// address in Safari, allow camera access, or try the Demo conveyor.`;
+  }
+}
+function useDemo(){
+  stopSource(); demo.start(); source = 'demo'; sizeView(demo.w, demo.h);
+  $('stageMsg').textContent = ''; $('demoOpts').style.display = 'block';
+  $('demoBtn').classList.add('sel'); $('camBtn').classList.remove('sel');
+  afterSource();
+}
+function afterSource(){ det.reset(); updateDots(); requestWake(); }
+const frameEl = () => source === 'camera' ? video : demo.canvas;
+const srcW = () => source === 'camera' ? video.videoWidth : demo.w;
+const srcH = () => source === 'camera' ? video.videoHeight : demo.h;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (source === 'camera' && (!stream || stream.getVideoTracks().every(t => t.readyState === 'ended'))) useCamera();
+  requestWake();
+});
+
+// ================= zone drawing =================
+let drag = null;
+function normPt(e){ const r = view.getBoundingClientRect();
+  return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; }
+view.addEventListener('pointerdown', e => {
+  if (!source) return;
+  if (sess.running){ toast('Pause the count to change the zone'); return; }
+  view.setPointerCapture(e.pointerId); drag = { a: normPt(e), b: normPt(e) };
+});
+view.addEventListener('pointermove', e => { if (drag) drag.b = normPt(e); });
+view.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const x = Math.min(drag.a.x, drag.b.x), y = Math.min(drag.a.y, drag.b.y), w = Math.abs(drag.a.x - drag.b.x), h = Math.abs(drag.a.y - drag.b.y);
+  drag = null;
+  if (w < 0.03 || h < 0.05){ toast('Zone too small — drag a larger box'); return; }
+  const changed = model.total() > 0;
+  ZONE = { x, y, w, h }; saveZone(); det.reset();
+  if (changed) toast('Zone changed — re-teach for best accuracy'); else toast('Zone set');
+  updateDots();
+});
+$('zoneReset').onclick = () => { ZONE = { x:0.44, y:0.15, w:0.12, h:0.72 }; saveZone(); det.reset(); toast('Zone reset'); };
+
+// ================= feature engines =================
+const TFJS_URL = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+const MOBILENET_URL = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json';
+const work = document.createElement('canvas'), wctx = work.getContext('2d', { willReadFrequently:true });
+const thumbC = document.createElement('canvas'); thumbC.width = thumbC.height = 64; const tctx = thumbC.getContext('2d');
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('script')); document.head.appendChild(s); }); }
+function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]); }
+function l2(f){ let s = 0; for (let i = 0; i < f.length; i++) s += f[i]*f[i]; s = Math.sqrt(s) || 1; for (let i = 0; i < f.length; i++) f[i] /= s; return f; }
+
+const engine = {
+  kind:'loading', size:224, net:null,
+  async init(){
+    try{
+      await withTimeout(loadScript(TFJS_URL), 20000);
+      await tf.ready();
+      const m = await withTimeout(tf.loadLayersModel(MOBILENET_URL), 30000);
+      const layer = m.getLayer('conv_pw_13_relu');
+      this.net = tf.model({ inputs: m.inputs, outputs: layer.output });
+      tf.tidy(() => this.net.predict(tf.zeros([1,224,224,3])));
+      this.kind = 'ai'; this.size = 224;
+    }catch(e){ this.kind = 'basic'; this.size = 16; }
+    work.width = work.height = this.size;
+    $('engineChip').textContent = this.kind === 'ai' ? 'AI: MobileNet' : 'Basic vision';
+    $('engineChip').title = this.kind === 'ai' ? 'Neural-network features + nearest-neighbour classifier' : 'AI model could not load (offline?). Using built-in pixel features.';
+    if (this.kind === 'basic') toast('AI model unavailable — using basic vision mode');
+    // drop samples taught with a different engine
+    if (model.engine && model.engine !== this.kind){ model.clear(0); model.clear(1); }
+    model.engine = this.kind;
+    $('holdEmpty').disabled = $('holdBottle').disabled = false;
+    renderProfiles();
+  },
+  grab(){
+    const W = srcW(), H = srcH(); if (!W || !H) return false;
+    wctx.drawImage(frameEl(), ZONE.x*W, ZONE.y*H, ZONE.w*W, ZONE.h*H, 0, 0, this.size, this.size);
+    return true;
+  },
+  async features(){
+    if (this.kind === 'ai'){
+      const t = tf.tidy(() => this.net.predict(tf.browser.fromPixels(work).toFloat().div(127.5).sub(1).expandDims()).mean([1,2]).squeeze());
+      const d = await t.data(); t.dispose(); return l2(Float32Array.from(d));
+    }
+    const px = wctx.getImageData(0, 0, 16, 16).data, f = new Float32Array(16*16*4), gray = new Float32Array(256);
+    for (let i = 0; i < 256; i++){ const r = px[i*4]/255, g = px[i*4+1]/255, b = px[i*4+2]/255; f[i*3] = r; f[i*3+1] = g; f[i*3+2] = b; gray[i] = .299*r + .587*g + .114*b; }
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++){
+      const gx = gray[y*16 + Math.min(15,x+1)] - gray[y*16 + Math.max(0,x-1)];
+      const gy = gray[Math.min(15,y+1)*16 + x] - gray[Math.max(0,y-1)*16 + x];
+      f[768 + y*16 + x] = Math.hypot(gx, gy) * 2;
+    }
+    return l2(f);
+  },
+  thumb(){ const W = srcW(), H = srcH();
+    tctx.drawImage(frameEl(), ZONE.x*W, ZONE.y*H, ZONE.w*W, ZONE.h*H, 0, 0, 64, 64);
+    try{ return thumbC.toDataURL('image/jpeg', 0.6); }catch(e){ return null; } }
+};
+
+// ================= teachable classifier (k-nearest neighbours) =================
+const MAXPER = 400;
+const model = {
+  engine:null, samples:[], counts:[0,0],
+  total(){ return this.samples.length; },
+  add(f, label){
+    if (this.counts[label] >= MAXPER){
+      const idx = []; this.samples.forEach((s, i) => s.l === label && idx.push(i));
+      this.samples[idx[Math.floor(Math.random()*idx.length)]] = { f, l:label };
+    } else { this.samples.push({ f, l:label }); this.counts[label]++; }
+  },
+  clear(label){ this.samples = this.samples.filter(s => s.l !== label); this.counts[label] = 0; },
+  ready(){ return this.counts[0] >= 5 && this.counts[1] >= 5; },
+  score(f){
+    const n = this.samples.length, k = Math.min(7, n), top = [];
+    for (let i = 0; i < n; i++){
+      const s = this.samples[i].f; let d = 0; for (let j = 0; j < f.length; j++) d += s[j]*f[j];
+      if (top.length < k){ top.push([d, this.samples[i].l]); top.sort((a,b) => a[0]-b[0]); }
+      else if (d > top[0][0]){ top[0] = [d, this.samples[i].l]; top.sort((a,b) => a[0]-b[0]); }
+    }
+    let sum = 0; top.forEach(t => sum += t[1]); return sum / top.length;
+  },
+  serialize(){ return { engine:this.engine, samples:this.samples.map(s => ({ l:s.l, f:Array.from(s.f, v => Math.round(v*1e4)/1e4) })) }; },
+  load(o){ this.samples = o.samples.map(s => ({ l:s.l, f:Float32Array.from(s.f) })); this.counts = [0,0]; this.samples.forEach(s => this.counts[s.l]++); }
+};
+
+// ================= detector (counting state machine) =================
+const det = {
+  ema:null, state:'empty', onCnt:0, offCnt:0, occStart:0, peak:0, thumb:null, jamFlag:false, raw:0,
+  reset(){ this.ema = null; this.state = 'empty'; this.onCnt = this.offCnt = 0; this.jamFlag = false; },
+  update(score, now){
+    this.raw = score;
+    this.ema = this.ema == null ? score : S.smooth * score + (1 - S.smooth) * this.ema;
+    const s = this.ema;
+    if (this.state === 'empty'){
+      if (s >= S.on){ if (++this.onCnt >= S.minOn){ this.state = 'occ'; this.occStart = now; this.peak = 0; this.thumb = null; this.offCnt = 0; this.jamFlag = false; } }
+      else this.onCnt = 0;
+    } else {
+      if (sess.running && s > this.peak + 0.05){ this.peak = s; this.thumb = engine.thumb(); }
+      if (s <= S.off){
+        if (++this.offCnt >= S.minOff){ this.state = 'empty'; this.onCnt = 0; if (sess.running) sess.autoCount(now - this.occStart, this.thumb, this.jamFlag); }
+      } else {
+        this.offCnt = 0;
+        const dw = sess.medianDwell(), lim = Math.max(4000, dw ? dw * 4 : 0);
+        if (!this.jamFlag && now - this.occStart > lim){ this.jamFlag = true; if (sess.running) showAlert('Zone occupied unusually long — jam, stopped bottle, or bottles touching? This count will be flagged.'); }
+      }
+    }
+  }
+};
+
+// ================= processing loop =================
+let busy = false, lastProc = 0, teachHold = -1, lastSample = 0, fpsN = 0, fpsT = performance.now();
+async function process(now){
+  busy = true;
+  try{
+    if (engine.kind === 'loading' || !engine.grab()) return;
+    const f = await engine.features();
+    if (teachHold >= 0 && now - lastSample >= 115){
+      model.add(f, teachHold); lastSample = now; updateTeach();
+    }
+    if (model.ready()){
+      det.update(model.score(f), now);
+      const p = Math.round(det.ema * 100);
+      $('mPct').textContent = p + '%'; $('mFill').style.width = p + '%'; $('mFill').classList.toggle('on', det.state === 'occ');
+    } else { $('mPct').textContent = 'teach first'; $('mFill').style.width = '0'; }
+    fpsN++;
+  } catch(e){ console.error(e); }
+  finally{ busy = false; }
+}
+
+function render(now){
+  if (source === 'demo'){ demo.step(now); demo.draw(); }
+  if (source){
+    const el = frameEl();
+    if (srcW()) vctx.drawImage(el, 0, 0, view.width, view.height);
+    drawZone();
+    if (!busy && now - lastProc >= 1000 / S.fps){ lastProc = now; process(now); }
+  }
+  if (now - fpsT >= 1000){ $('fpsChip').textContent = (source ? fpsN : '—') + ' fps'; fpsN = 0; fpsT = now; }
+  requestAnimationFrame(render);
+}
+function drawZone(){
+  const W = view.width, H = view.height, lw = Math.max(2, W / 240);
+  let z = ZONE;
+  if (drag) z = { x:Math.min(drag.a.x, drag.b.x), y:Math.min(drag.a.y, drag.b.y), w:Math.abs(drag.a.x - drag.b.x), h:Math.abs(drag.a.y - drag.b.y) };
+  const occ = det.state === 'occ' && model.ready();
+  vctx.save();
+  vctx.fillStyle = 'rgba(0,0,0,.28)';
+  vctx.fillRect(0, 0, W, z.y*H); vctx.fillRect(0, (z.y+z.h)*H, W, H); vctx.fillRect(0, z.y*H, z.x*W, z.h*H); vctx.fillRect((z.x+z.w)*W, z.y*H, W, z.h*H);
+  vctx.lineWidth = lw; vctx.strokeStyle = drag ? '#fff' : occ ? '#3ccf7a' : '#f5b400';
+  if (occ){ vctx.fillStyle = 'rgba(60,207,122,.18)'; vctx.fillRect(z.x*W, z.y*H, z.w*W, z.h*H); }
+  vctx.strokeRect(z.x*W, z.y*H, z.w*W, z.h*H);
+  vctx.font = `600 ${Math.max(11, W/48)}px system-ui,sans-serif`; vctx.fillStyle = vctx.strokeStyle;
+  vctx.fillText(drag ? 'ZONE' : occ ? 'BOTTLE' : 'ZONE', z.x*W + 4, Math.max(14, z.y*H - 6));
+  vctx.restore();
+}
+
+// ================= teaching UI =================
+function bindHold(btn, label){
+  const start = e => { e.preventDefault(); if (!source){ toast('Start the camera or demo first'); return; } teachHold = label; btn.classList.add('active'); };
+  const end = () => { if (teachHold === label){ teachHold = -1; btn.classList.remove('active'); saveWorking(); } };
+  btn.addEventListener('pointerdown', start);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => btn.addEventListener(ev, end));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+bindHold($('holdEmpty'), 0); bindHold($('holdBottle'), 1);
+$('clrEmpty').onclick = () => { model.clear(0); det.reset(); updateTeach(); saveWorking(); };
+$('clrBottle').onclick = () => { model.clear(1); det.reset(); updateTeach(); saveWorking(); };
+function updateTeach(){
+  $('nEmpty').textContent = model.counts[0]; $('nBottle').textContent = model.counts[1];
+  const r = model.ready(), good = model.counts[0] >= 30 && model.counts[1] >= 30;
+  $('teachState').textContent = !r ? 'need ≥5 of each' : good ? '✓ ready' : 'works — 30+ each is better';
+  $('teachState').style.color = !r ? 'var(--mute)' : good ? 'var(--ok)' : 'var(--amber)';
+  updateDots();
+}
+function updateDots(){
+  $('dZone').classList.toggle('done', !!source);
+  $('dTeach').classList.toggle('done', model.ready());
+  $('dCount').classList.toggle('done', sess.events.length > 0);
+}
+// keep current teaching across reloads (same zone & engine)
+function saveWorking(){ store.set('bc.working', { zone:ZONE, model:model.serialize() }); }
+function restoreWorking(){
+  const w = store.get('bc.working', null);
+  if (w && w.model && w.model.samples.length){ model.load(w.model); model.engine = w.model.engine; }
+}
+
+// ================= profiles =================
+function renderProfiles(){
+  const list = store.get('bc.profiles', []);
+  $('profList').innerHTML = list.length ? list.map((p, i) =>
+    `<div class="hist"><div class="t">${esc(p.name)}</div><div class="m">${new Date(p.saved).toLocaleString()} · ${p.model.samples.length} samples · ${p.model.engine === 'ai' ? 'AI' : 'basic'}</div>
+     <div class="row"><button class="btn" data-pa="load" data-i="${i}">Load</button><button class="btn" data-pa="del" data-i="${i}">Delete</button></div></div>`).join('')
+    : '<div class="empty">No saved setups yet.</div>';
+  $('profList').querySelectorAll('[data-pa]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i, p = list[i];
+    if (b.dataset.pa === 'del'){ list.splice(i, 1); store.set('bc.profiles', list); renderProfiles(); return; }
+    if (engine.kind !== 'loading' && p.model.engine !== engine.kind){ toast('This setup was taught in ' + (p.model.engine === 'ai' ? 'AI' : 'basic') + ' mode — re-teach needed'); return; }
+    ZONE = p.zone; saveZone(); model.load(p.model); model.engine = p.model.engine; det.reset();
+    $('lineName').value = p.name; updateTeach(); saveWorking(); toast('Loaded “' + p.name + '”');
+  });
+}
+$('profSave').onclick = () => {
+  if (!model.ready()) return toast('Teach the AI first');
+  const name = $('profName').value.trim() || $('lineName').value.trim() || 'Line setup';
+  const list = store.get('bc.profiles', []);
+  list.unshift({ name, saved:Date.now(), zone:ZONE, model:model.serialize() });
+  if (!store.set('bc.profiles', list.slice(0, 12))) return toast('Storage full — delete an old setup');
+  if (!$('lineName').value) $('lineName').value = name;
+  renderProfiles(); toast('Setup saved');
+};
+
+// ================= session =================
+const sess = {
+  running:false, started:false, accum:0, resumeAt:0, startWall:0, events:[], durMin:15, lastPosT:0,
+  elapsed(){ return this.accum + (this.running ? performance.now() - this.resumeAt : 0); },
+  medianDwell(){ const d = this.events.filter(e => e.type === 'auto').slice(-15).map(e => e.dwell).sort((a,b) => a-b); return d.length >= 3 ? d[Math.floor(d.length/2)] : 0; },
+  start(){
+    if (!this.started){ this.started = true; this.startWall = Date.now(); this.events = []; this.accum = 0; this.durMin = +$('durSel').value; $('thumbs').innerHTML = ''; }
+    this.running = true; this.resumeAt = performance.now(); det.reset(); hideAlert(); syncSess(); unlockAudio(); requestWake();
+  },
+  pause(){ this.accum += performance.now() - this.resumeAt; this.running = false; syncSess(); },
+  push(ev){ ev.t = this.elapsed(); ev.wall = Date.now(); this.events.push(ev); addThumb(ev, this.events.length); refreshStats(); updateDots(); },
+  autoCount(dwell, thumb, flag){ this.push({ type:'auto', dwell, thumb, flag:!!flag }); beep(); },
+  stats(){
+    const ev = this.events, pos = ev.filter(e => e.type !== 'remove');
+    const count = pos.length - ev.filter(e => e.type === 'remove').length;
+    const el = this.elapsed(); let down = 0, prev = 0;
+    // a gap (from session start or the previous bottle) longer than the stop threshold counts as downtime
+    pos.forEach(e => { const gap = e.t - prev; if (gap > S.stopSec * 1000) down += gap; prev = e.t; });
+    // cycle-time stats use running intervals only; gaps longer than the stop threshold are downtime, not cycles
+    const cyc = []; for (let i = 1; i < pos.length; i++){ const g = pos[i].t - pos[i-1].t; if (g <= S.stopSec * 1000) cyc.push(g); }
+    const openGap = el - prev; const stopped = this.started && openGap > S.stopSec * 1000;
+    if (stopped) down += openGap;
+    const run = Math.max(1, el - down), sorted = [...cyc].sort((a,b) => a-b), n = cyc.length;
+    const avg = n ? cyc.reduce((a,b) => a+b, 0) / n : null;
+    return {
+      count, el, down, run, stopped, n,
+      perMin: el > 5000 ? count / (el / 60000) : null, perMinNet: el > 5000 ? count / (run / 60000) : null,
+      avg, med: n ? (n % 2 ? sorted[(n-1)/2] : (sorted[n/2-1] + sorted[n/2]) / 2) : null,
+      min: n ? sorted[0] : null, max: n ? sorted[n-1] : null,
+      sd: n > 1 ? Math.sqrt(cyc.reduce((a,b) => a + (b-avg)**2, 0) / (n-1)) : null,
+      auto: ev.filter(e => e.type === 'auto').length, added: ev.filter(e => e.type === 'add').length,
+      removed: ev.filter(e => e.type === 'remove').length, flagged: ev.filter(e => e.flag).length
+    };
+  },
+  reset(){ this.running = false; this.started = false; this.accum = 0; this.events = []; syncSess(); refreshStats();
+    $('thumbs').innerHTML = '<div class="empty">Snapshots of each counted bottle appear here.</div>'; hideAlert(); }
+};
+function syncSess(){
+  const rb = $('runBtn');
+  rb.textContent = sess.running ? 'PAUSE' : sess.started ? 'RESUME' : 'START';
+  rb.className = 'btn ' + (sess.running ? 'warn' : 'go');
+  $('finishBtn').disabled = !sess.started;
+  $('plusBtn').disabled = $('minusBtn').disabled = !sess.started;
+  $('durSel').disabled = sess.started;
+}
+function refreshStats(){
+  const st = sess.stats();
+  $('count').textContent = st.count;
+  const s = $('sessState');
+  if (!sess.started){ s.textContent = 'READY'; s.className = 'state'; }
+  else if (!sess.running){ s.textContent = 'PAUSED'; s.className = 'state pause'; }
+  else if (st.stopped){ s.textContent = 'LINE STOPPED'; s.className = 'state stop'; }
+  else { s.textContent = '● COUNTING'; s.className = 'state run'; }
+  $('vRate').innerHTML = st.perMinNet != null ? st.perMinNet.toFixed(1) : '—';
+  $('vCycle').innerHTML = st.avg != null ? (st.avg/1000).toFixed(2) + '<small>s</small>' : '—';
+  $('vHour').innerHTML = st.perMinNet != null ? Math.round(st.perMinNet * 60).toLocaleString() : '—';
+  $('vElapsed').textContent = fmtDur(st.el);
+  $('vDown').textContent = fmtDur(st.down);
+  const lim = sess.started ? sess.durMin : +$('durSel').value;
+  $('vRemain').textContent = lim ? fmtDur(lim * 60000 - st.el) : '∞';
+  if (sess.running && lim && st.el >= lim * 60000){ sess.pause(); finish(true); }
+}
+setInterval(() => { if (sess.started) refreshStats(); }, 250);
+
+function addThumb(ev, n){
+  const box = $('thumbs'); if (box.querySelector('.empty')) box.innerHTML = '';
+  const d = document.createElement('div');
+  const time = new Date(ev.wall).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  d.className = 'th' + (ev.flag ? ' flag' : '') + (ev.type !== 'auto' ? ' man' : '');
+  d.innerHTML = (ev.type === 'auto' && ev.thumb ? `<img src="${ev.thumb}" alt="">` : `<div class="ph">${ev.type === 'add' ? '+1' : ev.type === 'remove' ? '−1' : '•'}</div>`) + `#${n}<br>${time}`;
+  box.prepend(d);
+  while (box.children.length > 40) box.lastChild.remove();
+}
+function showAlert(m){ const a = $('alert'); a.textContent = '⚠ ' + m; a.classList.add('show'); clearTimeout(showAlert.t); showAlert.t = setTimeout(hideAlert, 12000); }
+function hideAlert(){ $('alert').classList.remove('show'); }
+
+$('runBtn').onclick = () => {
+  if (!sess.running){
+    if (!source) return toast('Start the camera or demo first (step 1)');
+    if (!model.ready()) return toast('Teach the AI first (step 2)');
+    sess.start();
+  } else sess.pause();
+};
+$('finishBtn').onclick = () => { if (sess.running) sess.pause(); finish(false); };
+$('plusBtn').onclick = () => { sess.push({ type:'add' }); toast('+1 added'); };
+$('minusBtn').onclick = () => { if (sess.stats().count <= 0) return; sess.push({ type:'remove' }); toast('−1 removed'); };
+$('lineName').addEventListener('input', e => store.set('bc.line', e.target.value));
+$('lineName').value = store.get('bc.line', '');
+$('durSel').onchange = refreshStats;
+
+// ================= report / CSV / history =================
+function summaryOf(rec){
+  // rec: { line, startWall, durMin, settings, events } — recompute from events
+  const fake = Object.create(sess);
+  fake.events = rec.events; fake.started = true; fake.running = false; fake.accum = rec.elapsed;
+  return sess.stats.call(fake);
+}
+function record(){ return { id:Date.now(), line:$('lineName').value.trim(), startWall:sess.startWall, elapsed:sess.elapsed(), durMin:sess.durMin,
+  engine:engine.kind, stopSec:S.stopSec, events:sess.events.map(e => ({ type:e.type, t:Math.round(e.t), wall:e.wall, dwell:e.dwell ? Math.round(e.dwell) : null, flag:!!e.flag })) }; }
+function toCSV(rec){
+  const st = summaryOf(rec), L = [];
+  const f = (ms, d = 2) => ms == null ? '' : (ms/1000).toFixed(d);
+  L.push(`Line / product,"${(rec.line || '').replace(/"/g,'""')}"`, `Session start,${new Date(rec.startWall).toLocaleString().replace(/,/g,'')}`,
+    `Elapsed (s),${f(rec.elapsed,1)}`, `Downtime (s),${f(st.down,1)}`, `Run time (s),${f(st.run,1)}`, `Line-stop threshold (s),${rec.stopSec}`,
+    `Bottles counted,${st.count}`, `Auto counts,${st.auto}`, `Manual +1,${st.added}`, `Manual -1,${st.removed}`, `Flagged,${st.flagged}`,
+    `Bottles/min (run time),${st.perMinNet != null ? st.perMinNet.toFixed(2) : ''}`, `Bottles/min (elapsed),${st.perMin != null ? st.perMin.toFixed(2) : ''}`,
+    `Bottles/hour (run time),${st.perMinNet != null ? Math.round(st.perMinNet*60) : ''}`,
+    `Avg cycle excl. stops (s),${f(st.avg)}`, `Median cycle (s),${f(st.med)}`, `Min cycle (s),${f(st.min)}`, `Max cycle (s),${f(st.max)}`, `Std dev (s),${f(st.sd)}`,
+    `Vision mode,${rec.engine === 'ai' ? 'AI (MobileNet)' : 'Basic'}`, '',
+    '#,Clock time,Session time (s),Interval (s),Time in zone (s),Type,Flagged');
+  let prev = null, n = 0;
+  rec.events.forEach(e => {
+    n++;
+    const iv = e.type !== 'remove' && prev != null ? ((e.t - prev)/1000).toFixed(2) : '';
+    if (e.type !== 'remove') prev = e.t;
+    L.push([n, new Date(e.wall).toLocaleTimeString().replace(/,/g,''), (e.t/1000).toFixed(2), iv, e.dwell ? (e.dwell/1000).toFixed(2) : '',
+      e.type === 'auto' ? 'auto' : e.type === 'add' ? 'manual +1' : 'manual -1', e.flag ? 'yes' : ''].join(','));
+  });
+  return L.join('\n');
+}
+function reportHTML(rec){
+  const st = summaryOf(rec), f = ms => ms == null ? '—' : (ms/1000).toFixed(2) + ' s';
+  return `<table class="sum">
+    <tr><td>Bottles counted</td><td style="font-size:20px;color:var(--amber)">${st.count}</td></tr>
+    <tr><td>Bottles / min (run time)</td><td>${st.perMinNet != null ? st.perMinNet.toFixed(1) : '—'}</td></tr>
+    <tr><td>Bottles / hour (run time)</td><td>${st.perMinNet != null ? Math.round(st.perMinNet*60).toLocaleString() : '—'}</td></tr>
+    <tr><td>Bottles / min (incl. stops)</td><td>${st.perMin != null ? st.perMin.toFixed(1) : '—'}</td></tr>
+    <tr><td>Avg cycle time (excl. stops)</td><td>${f(st.avg)}</td></tr>
+    <tr><td>Median / min / max</td><td>${f(st.med)} · ${f(st.min)} · ${f(st.max)}</td></tr>
+    <tr><td>Std dev</td><td>${f(st.sd)}</td></tr>
+    <tr><td>Elapsed · downtime</td><td>${fmtDur(rec.elapsed)} · ${fmtDur(st.down)}</td></tr>
+    <tr><td>Auto · +1 · −1 · flagged</td><td>${st.auto} · ${st.added} · ${st.removed} · ${st.flagged}</td></tr></table>`;
+}
+function csvSheet(rec){
+  const csv = toCSV(rec);
+  const name = `bottles_${(rec.line || 'line').replace(/[^\w-]+/g,'_')}_${new Date(rec.startWall).toISOString().slice(0,16).replace(/[:T]/g,'-')}.csv`;
+  return { csv, name, html:`<textarea class="csv" readonly>${esc(csv)}</textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" id="xCopy">Copy</button><button class="btn" id="xDl">Download</button><button class="btn primary" id="xShare">Share</button></div>` };
+}
+function bindCsv(c){
+  $('xCopy').onclick = async () => { try{ await navigator.clipboard.writeText(c.csv); toast('CSV copied'); }
+    catch(e){ const ta = $('sheetBox').querySelector('textarea'); ta.focus(); ta.select(); toast('Selected — copy manually'); } };
+  $('xDl').onclick = () => { try{ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c.csv], { type:'text/csv' })); a.download = c.name;
+    document.body.appendChild(a); a.click(); a.remove(); }catch(e){ toast('Use Copy or Share'); } };
+  $('xShare').onclick = async () => { try{ const file = new File([c.csv], c.name, { type:'text/csv' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) await navigator.share({ files:[file], title:c.name }); else await navigator.share({ title:c.name, text:c.csv }); }
+    catch(e){ if (e && e.name !== 'AbortError') toast('Sharing not available — use Copy'); } };
+}
+function finish(auto){
+  const rec = record();
+  if (rec.events.length){ const h = store.get('bc.history', []); h.unshift(rec); store.set('bc.history', h.slice(0, 40)); }
+  const c = csvSheet(rec);
+  openSheet(`<h3>${auto ? 'Session time reached' : 'Session report'}</h3><p>${esc(rec.line || 'Unnamed line')} · ${new Date(rec.startWall).toLocaleString()}${rec.events.length ? ' · saved to History' : ''}</p>
+    ${reportHTML(rec)}${c.html}
+    <div class="row" style="margin-top:10px"><button class="btn" id="rKeep">Back</button><button class="btn go" id="rNew">New session</button></div>`);
+  bindCsv(c);
+  $('rKeep').onclick = closeSheet;
+  $('rNew').onclick = () => { closeSheet(); sess.reset(); };
+  syncSess(); refreshStats();
+}
+$('histBtn').onclick = function showHistory(){
+  const h = store.get('bc.history', []);
+  openSheet(`<h3>History</h3><p>${h.length ? 'Sessions stored on this phone.' : 'No sessions yet. Finished sessions are saved here automatically.'}</p>
+    ${h.map((r, i) => { const st = summaryOf(r); return `<div class="hist"><div class="t">${esc(r.line || 'Unnamed line')}</div>
+      <div class="m">${new Date(r.startWall).toLocaleString()} · ${fmtDur(r.elapsed)}<br>${st.count} bottles · ${st.perMinNet != null ? st.perMinNet.toFixed(1) : '—'}/min · avg cycle ${st.avg != null ? (st.avg/1000).toFixed(2) + ' s' : '—'}</div>
+      <div class="row"><button class="btn" data-h="view" data-i="${i}">Report</button><button class="btn" data-h="del" data-i="${i}">Delete</button></div></div>`; }).join('')}
+    <div class="row"><button class="btn" id="hClose">Close</button></div>`);
+  $('hClose').onclick = closeSheet;
+  $('sheetBox').querySelectorAll('[data-h]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (b.dataset.h === 'del'){ h.splice(i, 1); store.set('bc.history', h); showHistory(); return; }
+    const r = h[i], c = csvSheet(r);
+    openSheet(`<h3>${esc(r.line || 'Unnamed line')}</h3><p>${new Date(r.startWall).toLocaleString()}</p>${reportHTML(r)}${c.html}
+      <div class="row" style="margin-top:10px"><button class="btn" id="hBack">Back</button></div>`);
+    bindCsv(c); $('hBack').onclick = showHistory;
+  });
+};
+
+// ================= settings =================
+$('setBtn').onclick = () => {
+  const num = (id, label, help, v, step, min, max) => `<div class="opt"><div>${label}<small>${help}</small></div><input type="number" id="${id}" value="${v}" step="${step}" min="${min}" max="${max}" inputmode="decimal"></div>`;
+  openSheet(`<h3>Settings</h3>
+    ${num('oOn','Bottle threshold','Confidence needed to say a bottle entered (0–1)', S.on, 0.05, 0.5, 0.95)}
+    ${num('oOff','Clear threshold','Confidence below which the zone is empty (0–1)', S.off, 0.05, 0.05, 0.5)}
+    ${num('oMinOn','Frames to confirm bottle','Higher = ignores brief glitches', S.minOn, 1, 1, 10)}
+    ${num('oMinOff','Frames to confirm gap','Higher = avoids double counts', S.minOff, 1, 1, 10)}
+    ${num('oStop','Line stop after (s)','No bottle for this long counts as downtime', S.stopSec, 1, 3, 600)}
+    ${num('oFps','Analysis rate (fps)','Lower saves battery; keep ≥10 for fast lines', S.fps, 1, 5, 30)}
+    <div class="opt">Beep on each count<input type="checkbox" id="oBeep" ${S.beep ? 'checked' : ''}></div>
+    <div class="opt"><div>Keep screen on<small>If the screen still dims, set iPhone Auto-Lock to Never while counting</small></div><input type="checkbox" id="oWake" ${S.wake ? 'checked' : ''}></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="oDef">Defaults</button><button class="btn primary" id="oSave">Save</button></div>`);
+  $('oDef').onclick = () => { Object.assign(S, DEF); saveSettings(); applyThresh(); closeSheet(); toast('Defaults restored'); };
+  $('oSave').onclick = () => {
+    const g = (id, lo, hi) => { const v = parseFloat($(id).value); return isNaN(v) ? null : Math.min(hi, Math.max(lo, v)); };
+    S.on = g('oOn', .5, .95) ?? S.on; S.off = g('oOff', .05, .5) ?? S.off;
+    if (S.off >= S.on) S.off = Math.max(.05, S.on - .2);
+    S.minOn = Math.round(g('oMinOn', 1, 10) ?? S.minOn); S.minOff = Math.round(g('oMinOff', 1, 10) ?? S.minOff);
+    S.stopSec = g('oStop', 3, 600) ?? S.stopSec; S.fps = Math.round(g('oFps', 5, 30) ?? S.fps);
+    S.beep = $('oBeep').checked; S.wake = $('oWake').checked;
+    saveSettings(); applyThresh(); closeSheet(); toast('Settings saved');
+  };
+};
+function applyThresh(){ $('thOn').style.left = (S.on*100) + '%'; $('thOff').style.left = (S.off*100) + '%'; }
+
+// ================= beep / wake lock =================
+let actx = null;
+function unlockAudio(){ try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); }catch(e){} }
+function beep(){
+  if (!S.beep || !actx) return;
+  try{ const o = actx.createOscillator(), g = actx.createGain(); o.type = 'square'; o.frequency.value = 1200;
+    g.gain.setValueAtTime(.05, actx.currentTime); g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + .07);
+    o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + .08); }catch(e){}
+}
+let wakeLock = null;
+async function requestWake(){ if (!S.wake || !('wakeLock' in navigator) || wakeLock) return;
+  try{ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); }catch(e){} }
+
+// ================= demo controls =================
+$('camBtn').onclick = useCamera;
+$('demoBtn').onclick = useDemo;
+$('demoRate').oninput = e => { demo.rate = +e.target.value; $('demoRateLbl').textContent = e.target.value; };
+$('demoStop').onclick = () => { demo.stopUntil = performance.now() + 15000; toast('Demo line stopped for 15 s'); };
+
+// ================= install =================
+let deferred;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('installBtn').style.display = 'inline-block'; });
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (isIOS && !standalone) $('installBtn').style.display = 'inline-block';
+$('installBtn').onclick = async () => {
+  if (deferred){ deferred.prompt(); try{ await deferred.userChoice; }catch(e){} deferred = null; $('installBtn').style.display = 'none'; return; }
+  openSheet(`<h3>Install on iPhone</h3><p>In Safari, tap <b>Share</b> → <b>Add to Home Screen</b>. Open it once while online so the AI model is saved for offline use.</p><div class="row"><button class="btn primary" id="iOk">Got it</button></div>`);
+  $('iOk').onclick = closeSheet;
+};
+if ('serviceWorker' in navigator) window.addEventListener('load', () => { try{ navigator.serviceWorker.register('sw.js').catch(() => {}); }catch(e){} });
+
+// ================= boot =================
+restoreWorking(); applyThresh(); updateTeach(); syncSess(); refreshStats(); renderProfiles();
+engine.init();
+requestAnimationFrame(render);
+window.__bc = { demo, model, det, sess, engine, get zone(){ return ZONE; }, teach(l){ teachHold = l; }, S };
+})();
+</script>
+</body>
+</html>
